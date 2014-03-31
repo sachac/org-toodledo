@@ -1,0 +1,49 @@
+--- url-http.el	2012-02-09 20:55:49.501352900 -0500
++++ url-http.el-patch2	2012-02-09 20:56:01.897352900 -0500
+@@ -309,8 +309,11 @@
+ This allows us to use `mail-fetch-field', etc."
+   (declare (special url-http-end-of-headers))
+   (goto-char (point-min))
+-  (while (re-search-forward "\r$" url-http-end-of-headers t)
+-    (replace-match "")))
++  (let ((end (marker-position url-http-end-of-headers)))
++    (goto-char (point-min))
++    (while (re-search-forward "\r$" url-http-end-of-headers t)
++      (replace-match ""))
++    (- end url-http-end-of-headers)))
+ 
+ (defun url-http-handle-authentication (proxy)
+   (declare (special status success url-http-method url-http-data
+@@ -877,6 +880,7 @@
+   (if (> (- nd url-http-end-of-headers) url-http-content-length)
+       (progn
+ 	;; Found the end of the document!  Wheee!
++        (url-http-debug "End of document found!")
+ 	(url-display-percentage nil nil)
+ 	(url-lazy-message "Reading... done.")
+ 	(if (url-http-parse-headers)
+@@ -1005,11 +1009,13 @@
+ 		old-http t)
+ 	(when (re-search-forward "^\r*$" nil t)
+ 	  ;; Saw the end of the headers
+-	  (url-http-debug "Saw end of headers... (%s)" (buffer-name))
+ 	  (setq url-http-end-of-headers (set-marker (make-marker)
+ 						    (point))
+ 		end-of-headers t)
+-	  (url-http-clean-headers)))
++	  (url-http-debug "Saw end of headers... (%s) @ %d" 
++                          (buffer-name) 
++                          (marker-position url-http-end-of-headers))
++	  (setq nd (- nd (url-http-clean-headers)))))
+ 
+       (if (not end-of-headers)
+ 	  ;; Haven't seen the end of the headers yet, need to wait
+@@ -1082,7 +1088,7 @@
+ 	     (- nd url-http-end-of-headers))))
+ 	 ((integerp url-http-content-length)
+ 	  (url-http-debug
+-	   "Got a content-length, being smart about document end.")
++	   "Got a content-length %d, being smart about document end." url-http-content-length)
+ 	  (setq url-http-after-change-function
+ 		'url-http-content-length-after-change-function)
+ 	  (cond

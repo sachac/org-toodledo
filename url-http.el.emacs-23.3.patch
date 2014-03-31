@@ -1,0 +1,45 @@
+--- /home/cwhite/adf/emacs-23.3/lisp/url/url-http.el	2011-01-08 12:45:14.000000000 -0500
++++ url-http.el	2011-09-24 14:57:34.679151000 -0400
+@@ -64,6 +64,11 @@
+ nil will explicitly close the connection to the server after every
+ request.")
+ 
++(defvar url-http-inhibit-connection-reuse nil
++  "If t, do not attempt to reuse connections.  This is normally
++not needed, but if you get errors writing to an invalid process,
++try setting to t.")
++
+ ;(eval-when-compile
+ ;; These are all macros so that they are hidden from external sight
+ ;; when the file is byte-compiled.
+@@ -104,9 +109,12 @@
+   nil)
+ 
+ (defun url-http-find-free-connection (host port)
+-  (let ((conns (gethash (cons host port) url-http-open-connections))
++  (url-http-debug "Finding free connection: %s:%d" host port)
++  (let ((conns (if url-http-inhibit-connection-reuse nil 
++                 (gethash (cons host port) url-http-open-connections)))
+ 	(found nil))
+     (while (and conns (not found))
++      (url-http-debug "Testing conn: %S, process status %S" (car conns) (process-status (car conns)))
+       (if (not (memq (process-status (car conns)) '(run open connect)))
+ 	  (progn
+ 	    (url-http-debug "Cleaning up dead process: %s:%d %S"
+@@ -290,7 +298,7 @@
+              ;; End request
+              "\r\n"
+              ;; Any data
+-             url-http-data))
++             url-http-data (if url-http-data "\r\n")))
+            ""))
+     (url-http-debug "Request is: \n%s" request)
+     request))
+@@ -811,6 +819,7 @@
+ ;; These unfortunately cannot be macros... please ignore them!
+ (defun url-http-idle-sentinel (proc why)
+   "Remove (now defunct) process PROC from the list of open connections."
++  (url-http-debug "url-http-idle-sentinel: %S %s" proc why)
+   (maphash (lambda (key val)
+ 		(if (memq proc val)
+ 		    (puthash key (delq proc val) url-http-open-connections)))
